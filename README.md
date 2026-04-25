@@ -84,7 +84,7 @@ All paths are driven by environment variables with safe defaults:
 | `WIKI_ROOT` | `$HOME/.openclaw/workspace/wiki` | Where the markdown wiki lives |
 | `WIKI_SKILL_DIR` | `$HOME/.openclaw/workspace/skills/llm-wiki` | Where this skill is installed (scripts referenced by SKILL.md) |
 | `MCPORTER_CONFIG` | `$HOME/.openclaw/workspace/config/mcporter.json` | Optional — path to your [mcporter](https://github.com/CrazyPython/mcporter) config (for the Obsidian MCP server) |
-| `AWS_REGION` / `WIKI_EMBED_SECRET` | `us-east-1` / `jarvis/opensearch` | Only used by the optional `embed.py` (see below) |
+| `AWS_REGION` / `WIKI_EMBED_SECRET` | `us-east-1` / `llm-wiki/opensearch` | Only used by the optional `embed.py` (see below) |
 
 > The skill itself is **channel-agnostic**. It does not push notifications anywhere. If you
 > want weekly lint reports delivered to chat/email/a webhook, pipe `lint.py --summary` from

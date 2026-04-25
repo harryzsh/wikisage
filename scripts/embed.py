@@ -24,7 +24,7 @@ import boto3
 from datetime import datetime
 
 REGION = os.environ.get("AWS_REGION", "us-east-1")
-SECRET_NAME = os.environ.get("WIKI_EMBED_SECRET", "jarvis/opensearch")
+SECRET_NAME = os.environ.get("WIKI_EMBED_SECRET", "llm-wiki/opensearch")
 WORKSPACE = os.environ.get("WIKI_WORKSPACE", os.path.expanduser("~/.openclaw/workspace"))
 
 
@@ -149,7 +149,7 @@ def main():
     config = get_opensearch_config()
     endpoint = config["endpoint"]
     if not endpoint:
-        print("❌ OpenSearch endpoint 未配置，请更新 Secrets Manager: jarvis/opensearch")
+        print(f"❌ OpenSearch endpoint 未配置，请更新 Secrets Manager: {SECRET_NAME}")
         sys.exit(1)
 
     # 去掉 https:// 前缀
