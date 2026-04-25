@@ -1,0 +1,19 @@
+# Never commit actual wiki content
+wiki/
+wiki-clients/
+.ingest-cache.json
+.lint-history/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
