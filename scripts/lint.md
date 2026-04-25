@@ -22,11 +22,14 @@
 | 5 | 过时页面（超过 90 天未更新，按 mtime） | 脚本 ✅ |
 | 6 | 矛盾内容 / 被推翻的旧说法 / 数据空白 | **LLM**（Layer 2） |
 
-### cron 配置
+### 定时调度（跨平台）
 
+**Linux / macOS (cron)：**
 ```cron
 0 2 * * 1 WIKI_ROOT=$HOME/.openclaw/workspace/wiki python3 $HOME/.openclaw/workspace/skills/llm-wiki/scripts/lint.py --notify >> $HOME/.openclaw/workspace/wiki/.lint-history/cron.log 2>&1
 ```
+
+**Windows（Task Scheduler）**：详见 `README.md` 的 *Weekly lint schedule* 节（用 `python.exe`，而非 `python3`）。
 
 跑完推飞书通知：`"本周 Lint：X 孤儿、Y 缺失页、Z 缺交叉引用..."` + 报告路径。
 通知需要 `FEISHU_TARGET`（默认空，不推送）+ `openclaw` CLI 可用；详见 `lint.py` 注释。

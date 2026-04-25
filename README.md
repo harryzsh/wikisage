@@ -21,26 +21,51 @@ Inspired by Andrej Karpathy's "LLM wiki" pattern.
   - *Layer 2* — LLM walks the report and fixes issues interactively via MCP
 - **Obsidian MCP first**: all reads/writes prefer the filesystem-sandboxed Obsidian MCP server, with `read`/`write`/`edit` fallback
 - **Logged everything**: `log.md` is an append-only timeline of every ingest / query / lint operation
+- **Cross-platform**: Linux, macOS, Windows — pure `pathlib`, no POSIX-only calls
 
 ---
+
+## 🖥️ Platform support
+
+Works on **Linux, macOS, and Windows**. All scripts use `pathlib` + `os.path.expanduser("~")`,
+so `~` resolves correctly everywhere (`/home/you` on Linux, `/Users/you` on macOS,
+`C:\Users\you` on Windows). There are no POSIX-only syscalls.
+
+Only the *shell one-liners* in this README differ per OS — see platform-specific blocks below.
+
+> **Heads-up**: this skill relies on an **Obsidian filesystem MCP server** as its primary
+> read/write channel. It falls back to `read`/`write`/`edit` tools if MCP isn't wired up, but
+> you get meaningfully better behavior (sandboxing, structured errors) with it. See
+> [Dependencies](#-dependencies) below.
 
 ## 📦 Install
 
 ### As an OpenClaw skill
 
+**Linux / macOS:**
 ```bash
-# Clone into OpenClaw's workspace skills dir
 git clone https://github.com/<you>/llm-wiki-skill \
   ~/.openclaw/workspace/skills/llm-wiki
+```
+
+**Windows (PowerShell):**
+```powershell
+git clone https://github.com/<you>/llm-wiki-skill `
+  "$HOME\.openclaw\workspace\skills\llm-wiki"
 ```
 
 That's it — OpenClaw auto-discovers skills at startup.
 
 ### As a Claude Code skill
 
+**Linux / macOS:**
 ```bash
-git clone https://github.com/<you>/llm-wiki-skill \
-  ~/.claude/skills/llm-wiki
+git clone https://github.com/<you>/llm-wiki-skill ~/.claude/skills/llm-wiki
+```
+
+**Windows (PowerShell):**
+```powershell
+git clone https://github.com/<you>/llm-wiki-skill "$HOME\.claude\skills\llm-wiki"
 ```
 
 ### As a generic agent skill
@@ -63,19 +88,37 @@ All paths are driven by environment variables with safe defaults:
 | `FEISHU_CHANNEL` | `feishu` | Messaging channel name (forwarded to `openclaw message --channel`) |
 | `AWS_REGION` / `WIKI_EMBED_SECRET` | `us-east-1` / `jarvis/opensearch` | Only used by the optional `embed.py` (see below) |
 
-Set them once in your shell profile, agent env, or cron line:
+Set them once in your shell profile, agent env, or cron line.
 
+**Linux / macOS (bash/zsh):**
 ```bash
-export WIKI_ROOT=$HOME/my-wiki
-export WIKI_SKILL_DIR=$HOME/.openclaw/workspace/skills/llm-wiki
+export WIKI_ROOT="$HOME/my-wiki"
+export WIKI_SKILL_DIR="$HOME/.openclaw/workspace/skills/llm-wiki"
 ```
+
+**Windows (PowerShell, current session):**
+```powershell
+$env:WIKI_ROOT = "$HOME\my-wiki"
+$env:WIKI_SKILL_DIR = "$HOME\.openclaw\workspace\skills\llm-wiki"
+```
+
+**Windows (persistent, user-level):**
+```powershell
+[Environment]::SetEnvironmentVariable("WIKI_ROOT", "$HOME\my-wiki", "User")
+[Environment]::SetEnvironmentVariable("WIKI_SKILL_DIR", "$HOME\.openclaw\workspace\skills\llm-wiki", "User")
+```
+
+> **Note for Windows users**: defaults like `~/.openclaw/workspace/wiki` resolve to
+> `C:\Users\<you>\.openclaw\workspace\wiki`. If you prefer a more Windows-native location
+> (e.g. `%USERPROFILE%\Documents\wiki`), just set `WIKI_ROOT` explicitly.
 
 ---
 
 ## 🗂 Initial wiki layout
 
-After install, create the empty skeleton (or let the first ingest create it):
+After install, create the empty skeleton (or let the first ingest create it).
 
+**Linux / macOS:**
 ```bash
 mkdir -p "$WIKI_ROOT"/{raw,pages/{aws,ai,clients,projects,ops},.lint-history}
 cat > "$WIKI_ROOT/index.md" <<'EOF'
@@ -86,33 +129,73 @@ EOF
 touch "$WIKI_ROOT/log.md"
 ```
 
+**Windows (PowerShell):**
+```powershell
+$root = $env:WIKI_ROOT
+"raw","pages\aws","pages\ai","pages\clients","pages\projects","pages\ops",".lint-history" |
+  ForEach-Object { New-Item -ItemType Directory -Force -Path "$root\$_" | Out-Null }
+"# Wiki Index`n`n_Pages auto-listed here by the LLM after each ingest._" |
+  Set-Content -Path "$root\index.md" -Encoding UTF8
+New-Item -ItemType File -Force -Path "$root\log.md" | Out-Null
+```
+
 ---
 
 ## 🔌 Dependencies
 
-**Required:**
-- Python ≥ 3.9 (stdlib only for `lint.py` / `dedup.py`)
+### Required
+- **Python ≥ 3.9** (stdlib only for `lint.py` / `dedup.py` — no `pip install` needed)
+- **Git** (to clone this repo)
 
-**Recommended:**
-- [mcporter](https://github.com/CrazyPython/mcporter) with an Obsidian filesystem MCP server pointing at `$WIKI_ROOT`.
-  Example entry in `mcporter.json`:
-  ```json
-  {
-    "servers": {
-      "obsidian": {
-        "type": "stdio",
-        "command": "npx",
-        "args": ["-y", "@modelcontextprotocol/server-filesystem", "$WIKI_ROOT"]
-      }
+### Strongly recommended: Obsidian filesystem MCP server
+
+This skill is **designed around an Obsidian-style filesystem MCP server** as its primary
+read/write channel. All operating rules in [`SKILL.md`](./SKILL.md) assume the LLM can call
+`obsidian.read_text_file`, `obsidian.write_file`, `obsidian.edit_file`, `obsidian.list_directory`,
+`obsidian.search_files`, and `obsidian.list_allowed_directories`.
+
+**Why it matters:**
+- Sandboxes all writes inside `$WIKI_ROOT` (allowed-dir enforcement) — the LLM can't accidentally
+  touch files outside the wiki.
+- Gives structured errors the LLM can reason about, instead of raw shell failures.
+- Matches the Obsidian editor's view if you also open the same directory in Obsidian desktop
+  (with any filesystem-based sync plugin) — works fine on Windows, macOS, Linux.
+
+**How to wire it up via [mcporter](https://github.com/CrazyPython/mcporter):**
+
+Add this to your `mcporter.json` (path defaults to `~/.openclaw/workspace/config/mcporter.json`,
+or wherever `$MCPORTER_CONFIG` points):
+
+```json
+{
+  "servers": {
+    "obsidian": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "<absolute path to $WIKI_ROOT>"]
     }
   }
-  ```
-  Without mcporter the skill still works — the LLM falls back to ordinary `read` / `write` / `edit` tools.
+}
+```
 
-**Optional / experimental:**
+Replace `<absolute path to $WIKI_ROOT>` with the real path — most MCP launchers don't expand
+environment variables inside the `args` array. Examples:
+- Linux/macOS: `/home/you/.openclaw/workspace/wiki` or `/Users/you/wiki`
+- Windows:     `C:\\Users\\you\\.openclaw\\workspace\\wiki` (escape the backslashes in JSON)
+
+Alternative MCP servers that work the same way:
+- [`@modelcontextprotocol/server-filesystem`](https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem) (vanilla, used above)
+- Any other filesystem-style MCP server that exposes `read_text_file` / `write_file` / `edit_file` / `list_directory`
+
+**Fallback without MCP:** the skill still works — `SKILL.md` explicitly tells the LLM to fall
+back to plain `read` / `write` / `edit` tools and log that MCP is offline. You lose the sandbox
+guarantee but everything else keeps running.
+
+### Optional / experimental
 - `embed.py` — Bedrock Titan embeddings → OpenSearch indexing. Requires AWS creds, a secret named
-  `$WIKI_EMBED_SECRET` containing `{endpoint, username, password}`, and `boto3 + opensearch-py +
-  requests-aws4auth`. Skip unless you want semantic search on top of the wiki.
+  `$WIKI_EMBED_SECRET` containing `{endpoint, username, password}`, and
+  `pip install boto3 opensearch-py requests-aws4auth`. Skip unless you want semantic search on
+  top of the wiki.
 
 ---
 
@@ -130,16 +213,38 @@ Under the hood the agent follows the flows in `scripts/ingest.md`, `scripts/quer
 
 ---
 
-## 🗓 Weekly lint cron
+## 🗓 Weekly lint schedule
+
+### Linux / macOS (cron)
 
 ```cron
-# every Monday 02:00
+# every Monday 02:00 local time
 0 2 * * 1 WIKI_ROOT=$HOME/.openclaw/workspace/wiki FEISHU_TARGET=user:ou_xxxxxxxxx \
   python3 $HOME/.openclaw/workspace/skills/llm-wiki/scripts/lint.py --notify \
   >> $HOME/.openclaw/workspace/wiki/.lint-history/cron.log 2>&1
 ```
 
 If `FEISHU_TARGET` is unset, the lint still runs and writes a report — it just doesn't push.
+
+### Windows (Task Scheduler, PowerShell)
+
+Register a weekly task that runs Monday 02:00:
+
+```powershell
+$wikiRoot  = "$HOME\.openclaw\workspace\wiki"
+$skillDir  = "$HOME\.openclaw\workspace\skills\llm-wiki"
+$action    = New-ScheduledTaskAction -Execute "python" `
+    -Argument "`"$skillDir\scripts\lint.py`" --notify"
+$trigger   = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday -At 2am
+$principal = New-ScheduledTaskPrincipal -UserId "$env:USERNAME" -LogonType Interactive
+$settings  = New-ScheduledTaskSettingsSet -StartWhenAvailable
+
+Register-ScheduledTask -TaskName "llm-wiki-weekly-lint" `
+  -Action $action -Trigger $trigger -Principal $principal -Settings $settings
+
+# Also set WIKI_ROOT (and optionally FEISHU_TARGET) at user scope so the task inherits them:
+[Environment]::SetEnvironmentVariable("WIKI_ROOT", $wikiRoot, "User")
+```
 
 ---
 
