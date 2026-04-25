@@ -84,9 +84,11 @@ All paths are driven by environment variables with safe defaults:
 | `WIKI_ROOT` | `$HOME/.openclaw/workspace/wiki` | Where the markdown wiki lives |
 | `WIKI_SKILL_DIR` | `$HOME/.openclaw/workspace/skills/llm-wiki` | Where this skill is installed (scripts referenced by SKILL.md) |
 | `MCPORTER_CONFIG` | `$HOME/.openclaw/workspace/config/mcporter.json` | Optional — path to your [mcporter](https://github.com/CrazyPython/mcporter) config (for the Obsidian MCP server) |
-| `FEISHU_TARGET` | *(empty)* | Optional — `user:ou_xxx` or `chat:oc_xxx` if you want `lint.py --notify` to push weekly reports via `openclaw message` |
-| `FEISHU_CHANNEL` | `feishu` | Messaging channel name (forwarded to `openclaw message --channel`) |
 | `AWS_REGION` / `WIKI_EMBED_SECRET` | `us-east-1` / `jarvis/opensearch` | Only used by the optional `embed.py` (see below) |
+
+> The skill itself is **channel-agnostic**. It does not push notifications anywhere. If you
+> want weekly lint reports delivered to chat/email/a webhook, pipe `lint.py --summary` from
+> your scheduler — see [Weekly lint schedule](#-weekly-lint-schedule) for examples.
 
 Set them once in your shell profile, agent env, or cron line.
 
@@ -215,16 +217,39 @@ Under the hood the agent follows the flows in `scripts/ingest.md`, `scripts/quer
 
 ## 🗓 Weekly lint schedule
 
+`lint.py` only *scans* and writes a report to `$WIKI_ROOT/.lint-history/YYYY-MM-DD.md`. It
+does not push notifications anywhere — **delivery is your scheduler's job**. Use
+`--summary` to get a single-line status suitable for piping into mail/chat/webhooks.
+
 ### Linux / macOS (cron)
 
 ```cron
-# every Monday 02:00 local time
-0 2 * * 1 WIKI_ROOT=$HOME/.openclaw/workspace/wiki FEISHU_TARGET=user:ou_xxxxxxxxx \
-  python3 $HOME/.openclaw/workspace/skills/llm-wiki/scripts/lint.py --notify \
+# every Monday 02:00 local time: run full lint, write report to .lint-history/
+0 2 * * 1 WIKI_ROOT=$HOME/.openclaw/workspace/wiki \
+  python3 $HOME/.openclaw/workspace/skills/llm-wiki/scripts/lint.py \
   >> $HOME/.openclaw/workspace/wiki/.lint-history/cron.log 2>&1
 ```
 
-If `FEISHU_TARGET` is unset, the lint still runs and writes a report — it just doesn't push.
+**Pipe the one-line summary to whatever you use:**
+
+```bash
+# email
+python3 .../lint.py --summary | mail -s 'wiki lint' you@example.com
+
+# Slack incoming webhook
+python3 .../lint.py --summary | \
+  xargs -I{} curl -s -X POST -H 'Content-type: application/json' \
+    --data '{"text":"{}"}' https://hooks.slack.com/services/XXX/YYY/ZZZ
+
+# Any chat via openclaw CLI (Feishu / Discord / Telegram / Slack / ...)
+python3 .../lint.py --summary | \
+  xargs -I{} openclaw message send --channel feishu --target user:ou_xxx --message {}
+
+# Discord webhook
+python3 .../lint.py --summary | \
+  xargs -I{} curl -s -X POST -H 'Content-type: application/json' \
+    --data '{"content":"{}"}' https://discord.com/api/webhooks/XXX/YYY
+```
 
 ### Windows (Task Scheduler, PowerShell)
 
@@ -234,7 +259,7 @@ Register a weekly task that runs Monday 02:00:
 $wikiRoot  = "$HOME\.openclaw\workspace\wiki"
 $skillDir  = "$HOME\.openclaw\workspace\skills\llm-wiki"
 $action    = New-ScheduledTaskAction -Execute "python" `
-    -Argument "`"$skillDir\scripts\lint.py`" --notify"
+    -Argument "`"$skillDir\scripts\lint.py`""
 $trigger   = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday -At 2am
 $principal = New-ScheduledTaskPrincipal -UserId "$env:USERNAME" -LogonType Interactive
 $settings  = New-ScheduledTaskSettingsSet -StartWhenAvailable
@@ -242,9 +267,11 @@ $settings  = New-ScheduledTaskSettingsSet -StartWhenAvailable
 Register-ScheduledTask -TaskName "llm-wiki-weekly-lint" `
   -Action $action -Trigger $trigger -Principal $principal -Settings $settings
 
-# Also set WIKI_ROOT (and optionally FEISHU_TARGET) at user scope so the task inherits them:
 [Environment]::SetEnvironmentVariable("WIKI_ROOT", $wikiRoot, "User")
 ```
+
+To deliver a summary to chat/email, wrap it in a small script that pipes `lint.py --summary`
+into your tool of choice, then point the scheduled task at that wrapper.
 
 ---
 

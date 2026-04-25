@@ -26,13 +26,16 @@
 
 **Linux / macOS (cron)：**
 ```cron
-0 2 * * 1 WIKI_ROOT=$HOME/.openclaw/workspace/wiki python3 $HOME/.openclaw/workspace/skills/llm-wiki/scripts/lint.py --notify >> $HOME/.openclaw/workspace/wiki/.lint-history/cron.log 2>&1
+0 2 * * 1 WIKI_ROOT=$HOME/.openclaw/workspace/wiki python3 $HOME/.openclaw/workspace/skills/llm-wiki/scripts/lint.py >> $HOME/.openclaw/workspace/wiki/.lint-history/cron.log 2>&1
 ```
 
 **Windows（Task Scheduler）**：详见 `README.md` 的 *Weekly lint schedule* 节（用 `python.exe`，而非 `python3`）。
 
-跑完推飞书通知：`"本周 Lint：X 孤儿、Y 缺失页、Z 缺交叉引用..."` + 报告路径。
-通知需要 `FEISHU_TARGET`（默认空，不推送）+ `openclaw` CLI 可用；详见 `lint.py` 注释。
+脚本只写报告、打印到 stdout。**要推通知到邮件/聊天/webhook**，加 `--summary` 参数拿到一行摘要再在 cron/Task Scheduler 里自己 pipe，示例见 README。
+
+脚本本身不推通知，只写报告。想要「本周 Lint：X 孤儿、Y 缺失页…」这种推送：
+- 跳到 `--summary` 获取一行摘要
+- 在你的 cron/Task Scheduler 里 pipe 到那个工具（邮件、Slack webhook、Discord webhook、`openclaw message`、飞书自定义机器人…）
 
 ---
 

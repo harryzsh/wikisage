@@ -2,30 +2,33 @@
 """
 Wiki Lint 脚本（Karpathy LLM Wiki 模式 · Layer 1 机械扫描）
 
-Layer 1：机械扫描，写报告 + （可选）推通知
+Layer 1：机械扫描，写报告 + 打印摘要到 stdout
 Layer 2：LLM 介入整理（由用户说「整理 wiki」触发，不是这个脚本的事）
 
 用法：
   python3 lint.py                    # 完整 lint
   python3 lint.py --quick            # 轻量 lint（ingest 后触发）
   python3 lint.py --wiki-root /path  # 自定义 wiki 根目录（也可用 $WIKI_ROOT）
-  python3 lint.py --notify           # 跑完推通知（cron 用，需配 FEISHU_TARGET）
+  python3 lint.py --summary          # 只打印一行摘要到 stdout（给 cron pipe 用）
   python3 lint.py --no-log           # 不写 log.md（预览模式）
 
 环境变量：
   WIKI_ROOT          wiki markdown 根目录（默认 ~/.openclaw/workspace/wiki）
-  FEISHU_TARGET      飞书推送目标（默认空 → 不推送；形如 user:ou_xxx 或 chat:oc_xxx）
-  FEISHU_CHANNEL     message channel（默认 feishu）
 
 报告产出：
-  $WIKI_ROOT/.lint-history/YYYY-MM-DD.md   # 持久化
+  $WIKI_ROOT/.lint-history/YYYY-MM-DD.md   # 持久化报告
+  stdout                                    # 完整报告或一行摘要（带 --summary）
+
+推送通知？自行在 cron/Task Scheduler 里 pipe：
+  python3 lint.py --summary | mail -s 'wiki lint' you@example.com
+  python3 lint.py --summary | xargs -I{} openclaw message send --target user:xxx --message {}
+  python3 lint.py --summary | curl -X POST -d @- https://hooks.slack.com/services/...
 """
 
 import os
 import re
 import sys
 import argparse
-import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
 from collections import defaultdict
@@ -217,33 +220,32 @@ def write_report_file(wiki_dir: Path, report_md: str, now_date: str) -> Path:
     return report_file
 
 
-def notify_feishu(summary_text: str) -> bool:
-    """
-    可选：通过 openclaw message CLI 推送飞书 DM / 群。
-    需要环境变量：
-      FEISHU_TARGET    形如 user:ou_xxx 或 chat:oc_xxx
-      FEISHU_CHANNEL   默认 feishu
-    没配 FEISHU_TARGET 则静默跳过，不报错。
-    """
-    target = os.environ.get("FEISHU_TARGET", "").strip()
-    if not target:
-        return False
-    channel = os.environ.get("FEISHU_CHANNEL", "feishu")
-    try:
-        subprocess.run(
-            ["openclaw", "message", "send",
-             "--channel", channel,
-             "--target", target,
-             "--message", summary_text],
-            check=False, capture_output=True, timeout=60
-        )
-        return True
-    except Exception as e:
-        print(f"⚠️ Feishu 通知失败：{e}")
-        return False
+def build_summary(wiki_dir: Path, now_date: str, stats: dict) -> str:
+    """构造一行报警摘要，用于 --summary / 外部推送 pipe。"""
+    total_issues = (
+        stats.get("index_issues", 0)
+        + stats.get("orphans", 0)
+        + stats.get("missing_concepts", 0)
+        + stats.get("missing_cross_refs", 0)
+        + stats.get("stale", 0)
+        + stats.get("missing_confidence", 0)
+    )
+    report_path = f"{wiki_dir}/.lint-history/{now_date}.md"
+    if total_issues == 0:
+        return f"📚 Wiki Lint: ✅ 0 issues | report: {report_path}"
+    return (
+        f"📚 Wiki Lint: {total_issues} issues "
+        f"(index:{stats.get('index_issues', 0)} "
+        f"orphans:{stats.get('orphans', 0)} "
+        f"missing-concepts:{stats.get('missing_concepts', 0)} "
+        f"missing-xref:{stats.get('missing_cross_refs', 0)} "
+        f"stale:{stats.get('stale', 0)} "
+        f"no-confidence:{stats.get('missing_confidence', 0)}) "
+        f"| report: {report_path}"
+    )
 
 
-def run_lint(wiki_dir: Path, quick: bool = False, notify: bool = False, write_log: bool = True):
+def run_lint(wiki_dir: Path, quick: bool = False, write_log: bool = True, summary_only: bool = False):
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
     now_date = datetime.now().strftime("%Y-%m-%d")
     report_lines = [f"# Wiki Lint 报告 — {wiki_dir} — {now}\n"]
@@ -309,11 +311,13 @@ def run_lint(wiki_dir: Path, quick: bool = False, notify: bool = False, write_lo
         report_lines.append("")
 
     report = "\n".join(report_lines)
-    print(report)
+    if not summary_only:
+        print(report)
 
     # 写报告文件
     report_file = write_report_file(wiki_dir, report, now_date)
-    print(f"\n📄 报告已保存：{report_file.relative_to(wiki_dir)}")
+    if not summary_only:
+        print(f"\n📄 报告已保存：{report_file.relative_to(wiki_dir)}")
 
     # 追加 log.md
     if write_log:
@@ -331,30 +335,9 @@ def run_lint(wiki_dir: Path, quick: bool = False, notify: bool = False, write_lo
                 f.write(f"- 缺置信度标签：{stats['missing_confidence']} 个\n")
             f.write("\n")
 
-    # 推通知（可选）
-    if notify and not quick:
-        total_issues = (stats["index_issues"] + stats["orphans"]
-                        + stats["missing_concepts"] + stats["missing_cross_refs"]
-                        + stats["stale"] + stats["missing_confidence"])
-        if total_issues == 0:
-            summary = f"📚 本周 Wiki Lint 完毕\n\n✅ 完美，零问题\n\n报告：{wiki_dir}/.lint-history/{now_date}.md"
-        else:
-            summary = (
-                f"📚 本周 Wiki Lint 完毕\n\n"
-                f"扫描结果：\n"
-                f"- 📋 index 不一致：{stats['index_issues']}\n"
-                f"- ⚠️ 孤儿页面：{stats['orphans']}\n"
-                f"- 🔗 缺失概念页：{stats['missing_concepts']}\n"
-                f"- 🔀 缺失交叉引用：{stats['missing_cross_refs']}\n"
-                f"- 📅 过时页面：{stats['stale']}\n"
-                f"- 🏷️ 缺置信度标签：{stats['missing_confidence']}\n\n"
-                f"📄 报告：`{wiki_dir}/.lint-history/{now_date}.md`\n\n"
-                f"说「整理 wiki」让 LLM 逐项处理 ✨"
-            )
-        if notify_feishu(summary):
-            print(f"📬 通知已发送")
-        else:
-            print(f"ℹ️ 未推送（FEISHU_TARGET 未设置，或 openclaw CLI 不可用）")
+    # --summary: 只打一行到 stdout，供外部 pipe
+    if summary_only:
+        print(build_summary(wiki_dir, now_date, stats))
 
     return report, stats
 
@@ -363,7 +346,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--quick", action="store_true", help="轻量模式（只查 index.md）")
     parser.add_argument("--wiki-root", default=None, help="wiki 根目录（默认 $WIKI_ROOT 或 ~/.openclaw/workspace/wiki）")
-    parser.add_argument("--notify", action="store_true", help="跑完推通知（需 FEISHU_TARGET）")
+    parser.add_argument("--summary", action="store_true", help="只打印一行摘要到 stdout（供 cron/Scheduler pipe 到邮件/聊天/webhook）")
     parser.add_argument("--no-log", action="store_true", help="不追加 log.md（预览模式）")
     args = parser.parse_args()
 
@@ -376,6 +359,6 @@ if __name__ == "__main__":
     run_lint(
         wiki_dir=wiki_dir,
         quick=args.quick,
-        notify=args.notify,
         write_log=not args.no_log,
+        summary_only=args.summary,
     )
