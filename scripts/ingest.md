@@ -6,7 +6,7 @@
 简写下方示例省略了 `--config`，实际调用要带上：
 `--config $MCPORTER_CONFIG`（默认 `~/.openclaw/workspace/config/mcporter.json`）
 
-示例里的 `$WIKI_ROOT` 默认是 `~/.openclaw/workspace/wiki`，`$WIKI_SKILL_DIR` 默认是 `~/.openclaw/workspace/skills/llm-wiki`。
+示例里的 `$WIKI_ROOT` 默认是 `~/.openclaw/workspace/wiki`，`$WIKI_SKILL_DIR` 默认是 `~/.openclaw/workspace/skills/wikisage`。
 
 ---
 

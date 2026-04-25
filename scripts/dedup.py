@@ -61,7 +61,7 @@ def save_cache(cache: dict) -> None:
 def compute_hash(source: str) -> tuple[str, int]:
     """Return (sha256_hex, size_bytes) for a local path or URL. Raises on fetch errors."""
     if source.startswith(("http://", "https://")):
-        req = urllib.request.Request(source, headers={"User-Agent": "llm-wiki-dedup/1.0"})
+        req = urllib.request.Request(source, headers={"User-Agent": "wikisage-dedup/1.0"})
         with urllib.request.urlopen(req, timeout=30) as resp:
             data = resp.read()
     else:

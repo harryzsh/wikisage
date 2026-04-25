@@ -1,4 +1,4 @@
-# llm-wiki-skill
+# wikisage
 
 A **Karpathy-style LLM Wiki** packaged as an [AgentSkill](https://github.com/openclaw/openclaw) for
 [OpenClaw](https://openclaw.ai) / Claude Code / any skill-aware agent.
@@ -44,14 +44,14 @@ Only the *shell one-liners* in this README differ per OS — see platform-specif
 
 **Linux / macOS:**
 ```bash
-git clone https://github.com/<you>/llm-wiki-skill \
-  ~/.openclaw/workspace/skills/llm-wiki
+git clone https://github.com/harryzsh/wikisage \
+  ~/.openclaw/workspace/skills/wikisage
 ```
 
 **Windows (PowerShell):**
 ```powershell
-git clone https://github.com/<you>/llm-wiki-skill `
-  "$HOME\.openclaw\workspace\skills\llm-wiki"
+git clone https://github.com/harryzsh/wikisage `
+  "$HOME\.openclaw\workspace\skills\wikisage"
 ```
 
 That's it — OpenClaw auto-discovers skills at startup.
@@ -60,12 +60,12 @@ That's it — OpenClaw auto-discovers skills at startup.
 
 **Linux / macOS:**
 ```bash
-git clone https://github.com/<you>/llm-wiki-skill ~/.claude/skills/llm-wiki
+git clone https://github.com/harryzsh/wikisage ~/.claude/skills/wikisage
 ```
 
 **Windows (PowerShell):**
 ```powershell
-git clone https://github.com/<you>/llm-wiki-skill "$HOME\.claude\skills\llm-wiki"
+git clone https://github.com/harryzsh/wikisage "$HOME\.claude\skills\wikisage"
 ```
 
 ### As a generic agent skill
@@ -82,9 +82,9 @@ All paths are driven by environment variables with safe defaults:
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `WIKI_ROOT` | `$HOME/.openclaw/workspace/wiki` | Where the markdown wiki lives |
-| `WIKI_SKILL_DIR` | `$HOME/.openclaw/workspace/skills/llm-wiki` | Where this skill is installed (scripts referenced by SKILL.md) |
+| `WIKI_SKILL_DIR` | `$HOME/.openclaw/workspace/skills/wikisage` | Where this skill is installed (scripts referenced by SKILL.md) |
 | `MCPORTER_CONFIG` | `$HOME/.openclaw/workspace/config/mcporter.json` | Optional — path to your [mcporter](https://github.com/CrazyPython/mcporter) config (for the Obsidian MCP server) |
-| `AWS_REGION` / `WIKI_EMBED_SECRET` | `us-east-1` / `llm-wiki/opensearch` | Only used by the optional `embed.py` (see below) |
+| `AWS_REGION` / `WIKI_EMBED_SECRET` | `us-east-1` / `wikisage/opensearch` | Only used by the optional `embed.py` (see below) |
 
 > The skill itself is **channel-agnostic**. It does not push notifications anywhere. If you
 > want weekly lint reports delivered to chat/email/a webhook, pipe `lint.py --summary` from
@@ -95,19 +95,19 @@ Set them once in your shell profile, agent env, or cron line.
 **Linux / macOS (bash/zsh):**
 ```bash
 export WIKI_ROOT="$HOME/my-wiki"
-export WIKI_SKILL_DIR="$HOME/.openclaw/workspace/skills/llm-wiki"
+export WIKI_SKILL_DIR="$HOME/.openclaw/workspace/skills/wikisage"
 ```
 
 **Windows (PowerShell, current session):**
 ```powershell
 $env:WIKI_ROOT = "$HOME\my-wiki"
-$env:WIKI_SKILL_DIR = "$HOME\.openclaw\workspace\skills\llm-wiki"
+$env:WIKI_SKILL_DIR = "$HOME\.openclaw\workspace\skills\wikisage"
 ```
 
 **Windows (persistent, user-level):**
 ```powershell
 [Environment]::SetEnvironmentVariable("WIKI_ROOT", "$HOME\my-wiki", "User")
-[Environment]::SetEnvironmentVariable("WIKI_SKILL_DIR", "$HOME\.openclaw\workspace\skills\llm-wiki", "User")
+[Environment]::SetEnvironmentVariable("WIKI_SKILL_DIR", "$HOME\.openclaw\workspace\skills\wikisage", "User")
 ```
 
 > **Note for Windows users**: defaults like `~/.openclaw/workspace/wiki` resolve to
@@ -226,7 +226,7 @@ does not push notifications anywhere — **delivery is your scheduler's job**. U
 ```cron
 # every Monday 02:00 local time: run full lint, write report to .lint-history/
 0 2 * * 1 WIKI_ROOT=$HOME/.openclaw/workspace/wiki \
-  python3 $HOME/.openclaw/workspace/skills/llm-wiki/scripts/lint.py \
+  python3 $HOME/.openclaw/workspace/skills/wikisage/scripts/lint.py \
   >> $HOME/.openclaw/workspace/wiki/.lint-history/cron.log 2>&1
 ```
 
@@ -257,14 +257,14 @@ Register a weekly task that runs Monday 02:00:
 
 ```powershell
 $wikiRoot  = "$HOME\.openclaw\workspace\wiki"
-$skillDir  = "$HOME\.openclaw\workspace\skills\llm-wiki"
+$skillDir  = "$HOME\.openclaw\workspace\skills\wikisage"
 $action    = New-ScheduledTaskAction -Execute "python" `
     -Argument "`"$skillDir\scripts\lint.py`""
 $trigger   = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday -At 2am
 $principal = New-ScheduledTaskPrincipal -UserId "$env:USERNAME" -LogonType Interactive
 $settings  = New-ScheduledTaskSettingsSet -StartWhenAvailable
 
-Register-ScheduledTask -TaskName "llm-wiki-weekly-lint" `
+Register-ScheduledTask -TaskName "wikisage-weekly-lint" `
   -Action $action -Trigger $trigger -Principal $principal -Settings $settings
 
 [Environment]::SetEnvironmentVariable("WIKI_ROOT", $wikiRoot, "User")
@@ -292,7 +292,7 @@ not just bulk-dumping. Hence the confidence tags, the lint flow, and the append-
 ## 📁 Repository layout
 
 ```
-llm-wiki-skill/
+wikisage/
 ├── SKILL.md              # skill manifest + operating rules (what the LLM reads)
 ├── scripts/
 │   ├── ingest.md         # ingest flow spec

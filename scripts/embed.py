@@ -24,7 +24,7 @@ import boto3
 from datetime import datetime
 
 REGION = os.environ.get("AWS_REGION", "us-east-1")
-SECRET_NAME = os.environ.get("WIKI_EMBED_SECRET", "llm-wiki/opensearch")
+SECRET_NAME = os.environ.get("WIKI_EMBED_SECRET", "wikisage/opensearch")
 WORKSPACE = os.environ.get("WIKI_WORKSPACE", os.path.expanduser("~/.openclaw/workspace"))
 
 

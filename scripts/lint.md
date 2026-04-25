@@ -3,7 +3,7 @@
 对齐 Karpathy LLM Wiki 模式：**LLM 才是真正的 lint 者**，脚本只做机械扫描和提醒。
 
 示例里的 `$WIKI_ROOT` 默认是 `~/.openclaw/workspace/wiki`，
-`$WIKI_SKILL_DIR` 默认是 `~/.openclaw/workspace/skills/llm-wiki`。
+`$WIKI_SKILL_DIR` 默认是 `~/.openclaw/workspace/skills/wikisage`。
 
 ---
 
@@ -26,7 +26,7 @@
 
 **Linux / macOS (cron)：**
 ```cron
-0 2 * * 1 WIKI_ROOT=$HOME/.openclaw/workspace/wiki python3 $HOME/.openclaw/workspace/skills/llm-wiki/scripts/lint.py >> $HOME/.openclaw/workspace/wiki/.lint-history/cron.log 2>&1
+0 2 * * 1 WIKI_ROOT=$HOME/.openclaw/workspace/wiki python3 $HOME/.openclaw/workspace/skills/wikisage/scripts/lint.py >> $HOME/.openclaw/workspace/wiki/.lint-history/cron.log 2>&1
 ```
 
 **Windows（Task Scheduler）**：详见 `README.md` 的 *Weekly lint schedule* 节（用 `python.exe`，而非 `python3`）。
